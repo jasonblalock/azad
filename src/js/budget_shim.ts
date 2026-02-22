@@ -69,7 +69,7 @@ export async function correlateTransactionsWithOrders(
     const categorySummary = [...new Set(categories)].join('; ');
 
     return {
-      date: t.date,
+      date: new Date(t.date),
       amount: t.amount,
       cardInfo: t.cardInfo,
       vendor: t.vendor,
