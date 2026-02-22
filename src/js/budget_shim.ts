@@ -116,6 +116,40 @@ export async function downloadEnrichedCsv(
   await save_file.save(csvContent, `amazon_transactions_enriched_${today}.csv`);
 }
 
+const PENDING_STORAGE_KEY = 'azad_pending_categorization';
+
+export async function persistForCategorization(
+  enriched: EnrichedTransaction[]
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    chrome.storage.local.set({ [PENDING_STORAGE_KEY]: enriched }, () => {
+      if (chrome.runtime.lastError) {
+        reject(chrome.runtime.lastError.message);
+      } else {
+        resolve();
+      }
+    });
+  });
+}
+
+export function loadPendingCategorization(): Promise<EnrichedTransaction[] | null> {
+  return new Promise((resolve) => {
+    chrome.storage.local.get(PENDING_STORAGE_KEY, (result) => {
+      const raw = result[PENDING_STORAGE_KEY];
+      if (!raw) {
+        resolve(null);
+        return;
+      }
+      // Restore Date objects from serialized strings
+      const enriched = (raw as any[]).map((t: any) => ({
+        ...t,
+        date: new Date(t.date),
+      }));
+      resolve(enriched as EnrichedTransaction[]);
+    });
+  });
+}
+
 export async function exportBudgetData(
   transactions: transaction.Transaction[],
   orderMap: Record<string, azad_order.IOrder>,

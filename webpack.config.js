@@ -14,6 +14,7 @@ const chrome_extension_options = {
         inject: path.join(__dirname, "src", "js", "inject.ts"),
         background: path.join(__dirname, "src", "js", "background.ts"),
         control: path.join(__dirname, "src", "js", "control.ts"),
+        categorize: path.join(__dirname, "src", "js", "categorize.ts"),
         alltests: path.join(__dirname, "src", "tests", "all.ts"),
     },
     output: {
@@ -94,7 +95,9 @@ const chrome_extension_options = {
                 { from: "src/img/sort_desc.png" },
                 { from: "src/styles/datatables_override.css" },
                 { from: "src/styles/inject.css" },
-                { from: "src/styles/popup.css" }
+                { from: "src/styles/popup.css" },
+                { from: "src/html/categorize.html" },
+                { from: "src/styles/categorize.css" }
             ]
         })
     ]

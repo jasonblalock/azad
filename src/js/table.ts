@@ -392,6 +392,10 @@ async function reallyDisplayTransactions(
       addTransactionsCsvButton(transactions, getBackgroundPort);
       if (await settings.getBoolean('budget_export_enabled')) {
         addBudgetExportButton(transactions);
+        const ynabPat = await settings.getString('ynab_pat');
+        if (ynabPat) {
+          addCategorizationButton(transactions);
+        }
       }
       datatable_wrap.init(cols);
     } else {
@@ -407,6 +411,10 @@ async function reallyDisplayTransactions(
       addTransactionsCsvButton(transactions, getBackgroundPort);
       if (await settings.getBoolean('budget_export_enabled')) {
         addBudgetExportButton(transactions);
+        const ynabPat = await settings.getString('ynab_pat');
+        if (ynabPat) {
+          addCategorizationButton(transactions);
+        }
       }
     }
   });
@@ -473,6 +481,47 @@ function addTransactionsCsvButton(
       );
 
       csv.download(table, show_totals);
+    },
+    'azad_table_button'
+  );
+}
+
+function addCategorizationButton(
+  transactions: transaction.Transaction[],
+): void {
+  const buttonLabel = 'categorize for YNAB';
+  const loadingLabel = 'preparing categorization...';
+
+  util.addButton(
+    buttonLabel,
+    async function() {
+      const btn = document.querySelector(
+        `[button_name="${buttonLabel}"]`
+      );
+      if (btn) {
+        btn.textContent = loadingLabel;
+      }
+
+      try {
+        if (ordersForBudgetPromise) {
+          await ordersForBudgetPromise;
+        }
+        await budget_shim.exportBudgetData(
+          transactions,
+          order_map,
+          budget_shim.persistForCategorization,
+        );
+        chrome.runtime.sendMessage({
+          action: 'open_tab',
+          url: chrome.runtime.getURL('categorize.html'),
+        });
+      } catch (err) {
+        console.error('Failed to prepare categorization:', err);
+      } finally {
+        if (btn) {
+          btn.textContent = buttonLabel;
+        }
+      }
     },
     'azad_table_button'
   );
