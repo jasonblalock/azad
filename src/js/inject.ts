@@ -12,6 +12,7 @@ import * as git_hash from '../generated/git_hash';
 import * as iframeWorker from './iframe-worker';
 const lzjs = require('lzjs');
 import * as notice from './notice';
+import * as order_header from './order_header';
 import * as periods from './periods';
 import * as pageType from './page_type';
 import * as ports from './ports';
@@ -135,6 +136,44 @@ async function fetchAndShowOrdersByRange(
     orders, beautifulTable, ports.getBackgroundPort, client);
 }
 
+async function fetchOrderDetailsForBudget(
+  transactions: transaction.Transaction[],
+): Promise<void> {
+  if (!await settings.getBoolean('budget_export_enabled')) {
+    return;
+  }
+
+  const orderIds = [...new Set(
+    transactions.flatMap(t => t.orderIds).filter(id => id !== '??')
+  )];
+
+  if (orderIds.length === 0) {
+    return;
+  }
+
+  resetScheduler('budget order details');
+
+  const orders: azad_order.IOrder[] = [];
+  for (const orderId of orderIds) {
+    const header: order_header.IOrderHeader = {
+      id: orderId,
+      date: null,
+      site: SITE,
+      list_url: '',
+      detail_url: urls.getDefaultOrderDetailUrl(orderId, SITE),
+      payments_url: urls.getOrderPaymentUrl(orderId, SITE),
+      total: null,
+      who: null,
+    };
+    const order = azad_order.create(header, getScheduler(), () => true);
+    if (order) {
+      orders.push(order);
+    }
+  }
+
+  azad_table.populateOrderMapForBudget(orders);
+}
+
 async function registerContentScript(isIframeWorker: boolean) {
   const pgType = pageType.getPageType();
   const bg_port = await ports.getBackgroundPort();
@@ -217,6 +256,7 @@ function handleMessageFromBackgroundToRootContentPage(msg: any): void {
         const client: string = msg.client;
         (async ()=>{
           if (!pageType.isWorker()) {
+            await fetchOrderDetailsForBudget(msg.transactions);
             await azad_table.displayTransactions(
               msg.transactions,
               true,

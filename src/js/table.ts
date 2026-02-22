@@ -28,6 +28,7 @@ import * as util from './util';
 
 const order_map: Record<string, azad_order.IOrder> = {};
 let progress_indicator: progress_bar.IProgressIndicator|null = null;
+let ordersForBudgetPromise: Promise<void> | null = null;
 
 function appendCell(
   tr: HTMLTableRowElement,
@@ -480,11 +481,20 @@ function addTransactionsCsvButton(
 function addBudgetExportButton(
   transactions: transaction.Transaction[],
 ): void {
-  const title = "download budget export ('.csv')";
+  const buttonLabel = "download budget export ('.csv')";
+  const loadingLabel = "loading orders...";
+  const title = ordersForBudgetPromise ? loadingLabel : buttonLabel;
 
   util.addButton(
     title,
     async function() {
+      if (ordersForBudgetPromise) {
+        try {
+          await ordersForBudgetPromise;
+        } catch (err) {
+          console.warn('Error loading orders for budget export:', err);
+        }
+      }
       await budget_shim.exportBudgetData(
         transactions,
         order_map,
@@ -492,6 +502,34 @@ function addBudgetExportButton(
       );
     },
     'azad_table_button'
+  );
+
+  if (ordersForBudgetPromise) {
+    const updateLabel = () => {
+      const btn = document.querySelector(
+        `[button_name="${title}"]`
+      );
+      if (btn) {
+        btn.textContent = buttonLabel;
+        btn.setAttribute('button_name', buttonLabel);
+      }
+    };
+    ordersForBudgetPromise.then(updateLabel, updateLabel);
+  }
+}
+
+export function populateOrderMapForBudget(orders: azad_order.IOrder[]): void {
+  ordersForBudgetPromise = (async () => {
+    await Promise.allSettled(
+      orders.map(async (order) => {
+        const id = await order.id();
+        order_map[id] = order;
+        await order.item_list();
+      })
+    );
+  })();
+  ordersForBudgetPromise.catch(
+    (err) => console.warn('populateOrderMapForBudget error:', err)
   );
 }
 
