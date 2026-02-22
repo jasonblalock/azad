@@ -9,27 +9,26 @@ Amazon transactions imported into budget software (YNAB, Actual Budget, etc.) fr
 - Extension scrapes Amazon transactions and correlates them with order item details
 - Enriched CSV export with item descriptions and categories in memo field
 - Auto-fetches order details when transactions are scraped (no separate order scrape needed)
+- YNAB research in ./ynab-research.md
+- ynab-sdk-js installed (npm install ynab)
 
 ### Known Issues
 - **Categories not appearing in CSV** — likely `show_category_in_items_view` setting is off, or Amazon breadcrumb XPath is broken. Needs investigation.
-- **Memo field too long** — full Amazon product titles joined together are unreadable in YNAB's UI
+- **Memo field too long** — full Amazon product titles joined together are unreadable in YNAB's UI, very difficult to then categorize
 
 ## Ideal Progression
 
-### Milestone 2: YNAB API Integration
-- Add YNAB OAuth/personal access token auth to the extension
-- Fetch user's YNAB budget categories
-- Push enriched Amazon transactions to YNAB as split transactions via API
-- Foundation for the categorization UI
+### Milestone 2: YNAB Integration + Categorization UI
+Categorization must happen before pushing to YNAB — pushing uncategorized data with broken categories and overlong memos creates cleanup work, and we'd need to update those same transactions later. Better to categorize locally, then push clean data once.
 
-### Milestone 3: Categorization UI
-- Purpose-built UI within the extension (new tab or options page)
-- Pull uncategorized Amazon transactions from YNAB API
-- Correlate with Amazon order data from extension scrape
-- Show each item individually with description, price, and category picker (populated from user's actual YNAB categories)
-- User rapidly categorizes items, then pushes split transactions back to YNAB
+- Done: PAT auth to YNAB API
+- Done: Fetch user's budgets and categories (confirmed API access works)
+- Categorization UI within the extension (new tab or options page)
+- Show each item individually with description, price, and category picker (populated from user's cached YNAB categories)
+- User rapidly categorizes items locally
+- Push categorized, split transactions to YNAB via API as the final step
 
-### Milestone 4: AI-Assisted Categorization
+### Milestone 3: AI-Assisted Categorization
 - Feed item descriptions + user's YNAB categories to an LLM
 - AI suggests category for each item; user confirms/overrides in the UI
 - Cache confirmed ASIN-to-category mappings so repeat purchases auto-categorize
