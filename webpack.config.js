@@ -60,6 +60,9 @@ const chrome_extension_options = {
         ]
     },
     resolve: {
+        alias: {
+         'ExtPay': 'extpay',
+        },
         extensions: ['.tsx', '.ts', '.js'],
     },
     plugins: [

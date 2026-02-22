@@ -14,6 +14,7 @@ import * as notice from './notice';
 import * as progress_bar from './progress_bar';
 import * as request_scheduler from './request_scheduler';
 import * as settings from './settings';
+import * as budget_shim from './budget_shim';
 import * as transaction from './transaction';
 import * as stats from './statistics';
 import * as table_config from './table_config';
@@ -375,7 +376,7 @@ async function reallyDisplayTransactions(
   const table = await table_promise;
   banner.removeBanner();
 
-  $( () => {
+  $( async () => {
     if (beautiful) {
       datatable_wrap.destroy();
       util.removeButton('data table');
@@ -388,6 +389,9 @@ async function reallyDisplayTransactions(
       );
 
       addTransactionsCsvButton(transactions, getBackgroundPort);
+      if (await settings.getBoolean('budget_export_enabled')) {
+        addBudgetExportButton(transactions);
+      }
       datatable_wrap.init(cols);
     } else {
       util.removeButton('plain table');
@@ -400,6 +404,9 @@ async function reallyDisplayTransactions(
       );
 
       addTransactionsCsvButton(transactions, getBackgroundPort);
+      if (await settings.getBoolean('budget_export_enabled')) {
+        addBudgetExportButton(transactions);
+      }
     }
   });
 
@@ -465,6 +472,24 @@ function addTransactionsCsvButton(
       );
 
       csv.download(table, show_totals);
+    },
+    'azad_table_button'
+  );
+}
+
+function addBudgetExportButton(
+  transactions: transaction.Transaction[],
+): void {
+  const title = "download budget export ('.csv')";
+
+  util.addButton(
+    title,
+    async function() {
+      await budget_shim.exportBudgetData(
+        transactions,
+        order_map,
+        budget_shim.downloadEnrichedCsv,
+      );
     },
     'azad_table_button'
   );
