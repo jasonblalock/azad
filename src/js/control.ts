@@ -8,6 +8,7 @@ import * as settings from './settings';
 import * as util from './util';
 import * as git_hash from '../generated/git_hash';
 import * as periods from './periods';
+import * as ynab from './ynab_api';
 
 $(document).ready(function() {
   $('body').on(
@@ -319,6 +320,170 @@ function handleStopClick() {
   updateStateText('Scrape cancelled');
 }
 
+// YNAB Integration
+
+function setYnabStatus(text: string, state: 'success' | 'error' | 'pending') {
+  const el = document.getElementById('azad_ynab_status')!;
+  el.textContent = text;
+  el.className = `ynab_status_${state}`;
+}
+
+function populateBudgetDropdown(budgets: ynab.YnabBudget[], selectedId?: string) {
+  const select = document.getElementById('azad_ynab_budget_select') as HTMLSelectElement;
+  select.innerHTML = '';
+  budgets.forEach(b => {
+    const opt = document.createElement('option');
+    opt.value = b.id;
+    opt.textContent = b.name;
+    if (b.id === selectedId) opt.selected = true;
+    select.appendChild(opt);
+  });
+  document.getElementById('azad_ynab_budget_row')!.classList.remove('hidden');
+}
+
+function showYnabConnected(budgetName?: string) {
+  document.getElementById('azad_ynab_token_row')!.classList.add('hidden');
+  document.getElementById('azad_ynab_disconnect_row')!.classList.remove('hidden');
+  if (budgetName) {
+    setYnabStatus(`Connected — budget: ${budgetName}`, 'success');
+  } else {
+    setYnabStatus('Connected', 'success');
+  }
+}
+
+function resetYnabUI() {
+  document.getElementById('azad_ynab_token_row')!.classList.remove('hidden');
+  document.getElementById('azad_ynab_budget_row')!.classList.add('hidden');
+  document.getElementById('azad_ynab_categories_info')!.classList.add('hidden');
+  document.getElementById('azad_ynab_disconnect_row')!.classList.add('hidden');
+  (document.getElementById('azad_ynab_pat') as HTMLInputElement).value = '';
+  document.getElementById('azad_ynab_status')!.textContent = '';
+  document.getElementById('azad_ynab_status')!.className = '';
+}
+
+async function handleYnabConnect() {
+  const tokenInput = document.getElementById('azad_ynab_pat') as HTMLInputElement;
+  const token = tokenInput.value.trim();
+  if (!token) {
+    setYnabStatus('Please enter a token', 'error');
+    return;
+  }
+
+  setYnabStatus('Connecting...', 'pending');
+  try {
+    const budgets = await ynab.fetchBudgets(token);
+    await settings.storeString('ynab_pat', token);
+    populateBudgetDropdown(budgets);
+    showYnabConnected();
+
+    // Auto-select first budget if none saved
+    const savedBudgetId = await settings.getString('ynab_budget_id');
+    if (savedBudgetId && budgets.some(b => b.id === savedBudgetId)) {
+      (document.getElementById('azad_ynab_budget_select') as HTMLSelectElement).value = savedBudgetId;
+    }
+    // Trigger budget selection
+    await handleYnabBudgetChange();
+  } catch (err) {
+    if (err instanceof ynab.YnabApiError) {
+      if (err.status === 401) {
+        setYnabStatus('Invalid token', 'error');
+      } else if (err.status === 429) {
+        setYnabStatus('Rate limited — try again later', 'error');
+      } else {
+        setYnabStatus(`API error: ${err.detail}`, 'error');
+      }
+    } else {
+      setYnabStatus('Connection failed — check your network', 'error');
+    }
+  }
+}
+
+async function handleYnabBudgetChange() {
+  const select = document.getElementById('azad_ynab_budget_select') as HTMLSelectElement;
+  const budgetId = select.value;
+  const budgetName = select.options[select.selectedIndex]?.text || '';
+
+  if (!budgetId) return;
+
+  await settings.storeString('ynab_budget_id', budgetId);
+  await settings.storeString('ynab_budget_name', budgetName);
+
+  const token = await settings.getString('ynab_pat');
+  try {
+    const groups = await ynab.fetchCategories(token, budgetId);
+    await ynab.cacheCategories(groups);
+
+    const activeCount = groups
+      .filter(g => !g.hidden && !g.deleted)
+      .flatMap(g => g.categories)
+      .filter(c => !c.hidden && !c.deleted)
+      .length;
+
+    const infoEl = document.getElementById('azad_ynab_categories_info')!;
+    infoEl.textContent = `${activeCount} categories cached`;
+    infoEl.classList.remove('hidden');
+
+    showYnabConnected(budgetName);
+  } catch (err) {
+    if (err instanceof ynab.YnabApiError) {
+      setYnabStatus(`Failed to fetch categories: ${err.detail}`, 'error');
+    } else {
+      setYnabStatus('Failed to fetch categories', 'error');
+    }
+  }
+}
+
+async function handleYnabDisconnect() {
+  await settings.storeString('ynab_pat', '');
+  await settings.storeString('ynab_budget_id', '');
+  await settings.storeString('ynab_budget_name', '');
+  await ynab.clearCachedCategories();
+  resetYnabUI();
+}
+
+async function initYnab() {
+  // Wire up event handlers
+  document.getElementById('azad_ynab_connect')!
+    .addEventListener('click', handleYnabConnect);
+  document.getElementById('azad_ynab_budget_select')!
+    .addEventListener('change', handleYnabBudgetChange);
+  document.getElementById('azad_ynab_disconnect')!
+    .addEventListener('click', handleYnabDisconnect);
+
+  // Restore saved state
+  const token = await settings.getString('ynab_pat');
+  if (token) {
+    showYnabConnected();
+    try {
+      const budgets = await ynab.fetchBudgets(token);
+      const savedBudgetId = await settings.getString('ynab_budget_id');
+      const savedBudgetName = await settings.getString('ynab_budget_name');
+      populateBudgetDropdown(budgets, savedBudgetId);
+
+      if (savedBudgetName) {
+        showYnabConnected(savedBudgetName);
+      }
+
+      // Show cached category count
+      const cached = await ynab.getCachedCategories();
+      if (cached) {
+        const activeCount = cached
+          .filter(g => !g.hidden && !g.deleted)
+          .flatMap(g => g.categories)
+          .filter(c => !c.hidden && !c.deleted)
+          .length;
+        const infoEl = document.getElementById('azad_ynab_categories_info')!;
+        infoEl.textContent = `${activeCount} categories cached`;
+        infoEl.classList.remove('hidden');
+      }
+    } catch (err) {
+      // Token may have been revoked
+      setYnabStatus('Connection lost — please reconnect', 'error');
+      resetYnabUI();
+    }
+  }
+}
+
 function init() {
   settings.startMonitoringSettingsStorage();
   settings.initialiseUi();
@@ -330,6 +495,7 @@ function init() {
   registerActionButtons();
   registerPageButtons();
   startPeriodsLoop();
+  initYnab();
 }
 
 $(document).ready( () => init() );

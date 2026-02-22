@@ -3,7 +3,7 @@
   "name": "Amazon Order History Reporter",
   "content_security_policy": {
     "extension_pages":
-      "script-src 'self'; object-src 'self'; connect-src https://extensionpay.com https://azad-extension.co.uk"
+      "script-src 'self'; object-src 'self'; connect-src https://extensionpay.com https://azad-extension.co.uk https://api.ynab.com"
   },
   "permissions": [
     "contextMenus",

@@ -156,3 +156,10 @@ a:active {
 #azad_version {
   color: silver
 }
+
+#azad_ynab_section { margin-top: 5px; }
+#azad_ynab_status { font-size: 90%; margin: 3px 0; }
+.ynab_status_success { color: green; }
+.ynab_status_error { color: red; }
+.ynab_status_pending { color: orange; }
+#azad_ynab_budget_select { width: 220px; }

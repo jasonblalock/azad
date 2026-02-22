@@ -125,6 +125,28 @@
           </td>
         </tr>
       </table>
+      <div id="azad_ynab_section">
+        <div class="azad_separator"></div>
+        <b>YNAB Integration</b>
+        <div id="azad_ynab_token_row">
+          <label for="azad_ynab_pat">Personal Access Token:</label><br/>
+          <input type="password" id="azad_ynab_pat"
+                 placeholder="Paste your YNAB token"
+                 style="width:220px;" />
+          <input type="button" id="azad_ynab_connect"
+                 value="Connect" class="azad_always_button" />
+        </div>
+        <div id="azad_ynab_status"></div>
+        <div id="azad_ynab_budget_row" class="hidden">
+          <label for="azad_ynab_budget_select">Budget:</label>
+          <select id="azad_ynab_budget_select"></select>
+        </div>
+        <div id="azad_ynab_categories_info" class="hidden"></div>
+        <div id="azad_ynab_disconnect_row" class="hidden">
+          <input type="button" id="azad_ynab_disconnect"
+                 value="Disconnect" class="azad_always_button" />
+        </div>
+      </div>
       <div class="azad_separator"></div>
       <div>
         <table width="100%">
