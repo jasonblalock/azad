@@ -28,6 +28,7 @@ import * as util from './util';
 
 const order_map: Record<string, azad_order.IOrder> = {};
 let progress_indicator: progress_bar.IProgressIndicator|null = null;
+let historyStatePushed = false;
 let ordersForBudgetPromise: Promise<void> | null = null;
 
 function appendCell(
@@ -284,6 +285,10 @@ async function reallyDisplay(
     delete order_map[entry];
   }
 
+  if (!historyStatePushed) {
+    util.pushTableState();
+    historyStatePushed = true;
+  }
   util.clearBody();
   banner.addBanner();
   addProgressBar();
@@ -361,6 +366,10 @@ async function reallyDisplayTransactions(
 ): Promise<HTMLTableElement> {
   console.log('amazon_order_history_table.reallyDisplayTransactions starting');
 
+  if (!historyStatePushed) {
+    util.pushTableState();
+    historyStatePushed = true;
+  }
   util.clearBody();
   banner.addBanner();
 

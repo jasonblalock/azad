@@ -139,6 +139,24 @@ export function removeButton(name: string) {
     }
 }
 
+let tableStateActive = false;
+
+export function pushTableState(): void {
+    if (tableStateActive) {
+        return;
+    }
+    tableStateActive = true;
+    window.addEventListener('popstate', (event) => {
+        event.stopImmediatePropagation();
+        if (event.state?.azad_table) {
+            history.back();
+        } else {
+            location.reload();
+        }
+    }, true);
+    history.pushState({ azad_table: true }, '');
+}
+
 export function clearBody(): void {
     Array.from(document.body.children).forEach(
         function(elem: Element) {
