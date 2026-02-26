@@ -385,7 +385,16 @@ function registerMessageListener() {
         break;
       case 'open_tab':
         console.log('opening: ' + request.url);
-        chrome.tabs.create({ url: request.url });
+        chrome.tabs.query({ url: request.url }, (tabs) => {
+          if (tabs.length > 0 && tabs[0].id != null) {
+            chrome.tabs.update(tabs[0].id, { active: true });
+            if (tabs[0].windowId != null) {
+              chrome.windows.update(tabs[0].windowId, { focused: true });
+            }
+          } else {
+            chrome.tabs.create({ url: request.url });
+          }
+        });
         break;
       default:
         console.trace('ignoring action: ' + request.action);

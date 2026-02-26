@@ -257,6 +257,7 @@ function handleMessageFromBackgroundToRootContentPage(msg: any): void {
         (async ()=>{
           if (!pageType.isWorker()) {
             await fetchOrderDetailsForBudget(msg.transactions);
+            azad_table.autoEnrichForCategorization(msg.transactions);
             await azad_table.displayTransactions(
               msg.transactions,
               true,

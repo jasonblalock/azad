@@ -30,6 +30,7 @@ const order_map: Record<string, azad_order.IOrder> = {};
 let progress_indicator: progress_bar.IProgressIndicator|null = null;
 let historyStatePushed = false;
 let ordersForBudgetPromise: Promise<void> | null = null;
+let autoEnrichPromise: Promise<void> | null = null;
 
 function appendCell(
   tr: HTMLTableRowElement,
@@ -403,7 +404,7 @@ async function reallyDisplayTransactions(
         addBudgetExportButton(transactions);
         const ynabPat = await settings.getString('ynab_pat');
         if (ynabPat) {
-          addCategorizationButton(transactions);
+          addCategorizationButton();
         }
       }
       datatable_wrap.init(cols);
@@ -422,7 +423,7 @@ async function reallyDisplayTransactions(
         addBudgetExportButton(transactions);
         const ynabPat = await settings.getString('ynab_pat');
         if (ynabPat) {
-          addCategorizationButton(transactions);
+          addCategorizationButton();
         }
       }
     }
@@ -495,11 +496,9 @@ function addTransactionsCsvButton(
   );
 }
 
-function addCategorizationButton(
-  transactions: transaction.Transaction[],
-): void {
-  const buttonLabel = 'categorize for YNAB';
-  const loadingLabel = 'preparing categorization...';
+function addCategorizationButton(): void {
+  const buttonLabel = 'open categorization';
+  const loadingLabel = 'waiting for data...';
 
   util.addButton(
     buttonLabel,
@@ -512,20 +511,15 @@ function addCategorizationButton(
       }
 
       try {
-        if (ordersForBudgetPromise) {
-          await ordersForBudgetPromise;
+        if (autoEnrichPromise) {
+          await autoEnrichPromise;
         }
-        await budget_shim.exportBudgetData(
-          transactions,
-          order_map,
-          budget_shim.persistForCategorization,
-        );
         chrome.runtime.sendMessage({
           action: 'open_tab',
           url: chrome.runtime.getURL('categorize.html'),
         });
       } catch (err) {
-        console.error('Failed to prepare categorization:', err);
+        console.error('Failed to open categorization:', err);
       } finally {
         if (btn) {
           btn.textContent = buttonLabel;
@@ -588,6 +582,24 @@ export function populateOrderMapForBudget(orders: azad_order.IOrder[]): void {
   })();
   ordersForBudgetPromise.catch(
     (err) => console.warn('populateOrderMapForBudget error:', err)
+  );
+}
+
+export function autoEnrichForCategorization(
+  transactions: transaction.Transaction[],
+): void {
+  autoEnrichPromise = (async () => {
+    if (ordersForBudgetPromise) {
+      await ordersForBudgetPromise;
+    }
+    await budget_shim.exportBudgetData(
+      transactions,
+      order_map,
+      budget_shim.mergeForCategorization,
+    );
+  })();
+  autoEnrichPromise.catch(
+    (err) => console.warn('autoEnrichForCategorization error:', err)
   );
 }
 

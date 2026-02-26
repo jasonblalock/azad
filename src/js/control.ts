@@ -8,6 +8,7 @@ import * as settings from './settings';
 import * as util from './util';
 import * as git_hash from '../generated/git_hash';
 import * as periods from './periods';
+import * as budget_shim from './budget_shim';
 import * as ynab from './ynab_api';
 
 $(document).ready(function() {
@@ -355,6 +356,7 @@ function resetYnabUI() {
   document.getElementById('azad_ynab_token_row')!.classList.remove('hidden');
   document.getElementById('azad_ynab_budget_row')!.classList.add('hidden');
   document.getElementById('azad_ynab_categories_info')!.classList.add('hidden');
+  document.getElementById('azad_ynab_open_categorize_row')!.classList.add('hidden');
   document.getElementById('azad_ynab_disconnect_row')!.classList.add('hidden');
   (document.getElementById('azad_ynab_pat') as HTMLInputElement).value = '';
   document.getElementById('azad_ynab_status')!.textContent = '';
@@ -449,6 +451,13 @@ async function initYnab() {
     .addEventListener('change', handleYnabBudgetChange);
   document.getElementById('azad_ynab_disconnect')!
     .addEventListener('click', handleYnabDisconnect);
+  document.getElementById('azad_ynab_open_categorize')!
+    .addEventListener('click', () => {
+      chrome.runtime.sendMessage({
+        action: 'open_tab',
+        url: chrome.runtime.getURL('categorize.html'),
+      });
+    });
 
   // Restore saved state
   const token = await settings.getString('ynab_pat');
@@ -475,6 +484,14 @@ async function initYnab() {
         const infoEl = document.getElementById('azad_ynab_categories_info')!;
         infoEl.textContent = `${activeCount} categories cached`;
         infoEl.classList.remove('hidden');
+      }
+
+      // Show "Open Categorization" button if pending data exists
+      const pending = await budget_shim.loadPendingCategorization();
+      if (pending && pending.length > 0) {
+        const catBtn = document.getElementById('azad_ynab_open_categorize')! as HTMLInputElement;
+        catBtn.value = `Open Categorization (${pending.length} transactions)`;
+        document.getElementById('azad_ynab_open_categorize_row')!.classList.remove('hidden');
       }
     } catch (err) {
       // Token may have been revoked

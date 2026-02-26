@@ -118,13 +118,35 @@ export async function downloadEnrichedCsv(
 
 const PENDING_STORAGE_KEY = 'azad_pending_categorization';
 
-export async function persistForCategorization(
+function transactionKey(t: EnrichedTransaction): string {
+  if (t.orderIds.length > 0) {
+    return t.orderIds.slice().sort().join(',');
+  }
+  return `${t.date.toISOString()}|${t.amount}|${t.vendor}`;
+}
+
+function serializeTransaction(t: EnrichedTransaction): any {
+  return { ...t, date: t.date.toISOString() };
+}
+
+function deserializeTransaction(raw: any): EnrichedTransaction {
+  return { ...raw, date: new Date(raw.date) } as EnrichedTransaction;
+}
+
+export async function mergeForCategorization(
   enriched: EnrichedTransaction[]
 ): Promise<void> {
-  const serializable = enriched.map(t => ({
-    ...t,
-    date: t.date.toISOString(),
-  }));
+  const existing = await loadPendingCategorization();
+  const pool = new Map<string, EnrichedTransaction>();
+  if (existing) {
+    for (const t of existing) {
+      pool.set(transactionKey(t), t);
+    }
+  }
+  for (const t of enriched) {
+    pool.set(transactionKey(t), t);
+  }
+  const serializable = Array.from(pool.values()).map(serializeTransaction);
   return new Promise((resolve, reject) => {
     chrome.storage.local.set({ [PENDING_STORAGE_KEY]: serializable }, () => {
       if (chrome.runtime.lastError) {
@@ -144,12 +166,7 @@ export function loadPendingCategorization(): Promise<EnrichedTransaction[] | nul
         resolve(null);
         return;
       }
-      // Restore Date objects from serialized strings
-      const enriched = (raw as any[]).map((t: any) => ({
-        ...t,
-        date: new Date(t.date),
-      }));
-      resolve(enriched as EnrichedTransaction[]);
+      resolve((raw as any[]).map(deserializeTransaction));
     });
   });
 }

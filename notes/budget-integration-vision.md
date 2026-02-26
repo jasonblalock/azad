@@ -31,10 +31,14 @@ Categorization must happen before pushing to YNAB — pushing uncategorized data
   - Green row highlighting on assignment, debounced auto-save to `chrome.storage.local`
   - Selections persist across tab close/reopen
   - Transactions with no items get a single category picker for the whole transaction
-- "Categorize for YNAB" button in table UI (gated on `budget_export_enabled` + `ynab_pat` non-empty)
-- Data persistence: enriched transactions serialized to `chrome.storage.local` with proper Date handling
+- Accumulating storage: enriched transactions merge across scrapes (deduped by transaction identity), not overwritten
+- Auto-persist: enrichment runs automatically after order details finish — no manual button click needed
+- Popup "Open Categorization (N transactions)" button as primary entry point (visible when pending data exists)
+- "Open categorization" button on Amazon table (awaits auto-enrich, then opens tab)
+- Tab reuse: opening categorization focuses existing tab instead of creating duplicates
 - Back-button fix to prevent broken navigation states after table injection
-- Detailed plan in ./greedy-forging-blanket.md
+- Architecture docs in ./base-azad-research.md and ./budget-integration-architecture.md
+- Detailed categorization UI plan in ./greedy-forging-blanket.md
 
 ### Remaining
 - **YNAB push** — read saved assignments and push split transactions via YNAB API
@@ -69,7 +73,9 @@ Categorization must happen before pushing to YNAB — pushing uncategorized data
 
 ## Design Principles
 
-1. **Handler callback pattern** — `exportBudgetData` already takes a handler function. API push is just a different handler. Keep this pattern.
-2. **Extension architecture** — API calls go through background service worker (avoids CORS). Follow existing `fetch_url` message pattern in `background.ts`.
-3. **Incremental value** — each milestone is independently useful. CSV export works today, API push is better, categorization UI is best.
-4. **Provider-agnostic correlation** — the enrichment engine (`budget_shim.ts`) stays budget-software-neutral. Provider-specific code lives in separate modules.
+1. **Categorization UI as command center** — the categorize tab is the primary destination, not a side effect of scraping. Data flows in automatically; the user works through their inbox.
+2. **Accumulate, don't overwrite** — each scrape adds to the pool. Re-scraping the same range updates existing entries. Category assignments persist independently across scrapes.
+3. **Handler callback pattern** — `exportBudgetData` takes a handler function. CSV export, merge-to-pool, and future API push are all just different handlers.
+4. **Extension architecture** — API calls go through background service worker (avoids CORS). Follow existing `fetch_url` message pattern in `background.ts`.
+5. **Incremental value** — each milestone is independently useful. CSV export works today, categorization UI is better, API push is best.
+6. **Provider-agnostic correlation** — the enrichment engine (`budget_shim.ts`) stays budget-software-neutral. Provider-specific code lives in separate modules.
