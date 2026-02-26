@@ -52,6 +52,7 @@ function saveAssignments(assignments: Assignments): void {
 }
 
 function formatDate(d: Date): string {
+  if (isNaN(d.getTime())) return '(unknown date)';
   return d.toLocaleDateString('en-US', {
     year: 'numeric', month: 'short', day: 'numeric',
   });

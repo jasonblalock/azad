@@ -121,8 +121,12 @@ const PENDING_STORAGE_KEY = 'azad_pending_categorization';
 export async function persistForCategorization(
   enriched: EnrichedTransaction[]
 ): Promise<void> {
+  const serializable = enriched.map(t => ({
+    ...t,
+    date: t.date.toISOString(),
+  }));
   return new Promise((resolve, reject) => {
-    chrome.storage.local.set({ [PENDING_STORAGE_KEY]: enriched }, () => {
+    chrome.storage.local.set({ [PENDING_STORAGE_KEY]: serializable }, () => {
       if (chrome.runtime.lastError) {
         reject(chrome.runtime.lastError.message);
       } else {
