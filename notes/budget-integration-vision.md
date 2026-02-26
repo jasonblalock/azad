@@ -60,11 +60,13 @@ Categorization must happen before pushing to YNAB — pushing uncategorized data
 - Flatten same-category items into single subtransactions (memo joined by ` | `)
 - Push split transactions to YNAB API via background service worker
 - Order IDs in parent transaction memo
+- Remove successfully pushed transactions from `azad_pending_categorization` (this is how the pending queue clears — no manual "clear" button needed)
 
 ### Milestone 3: AI-Assisted Categorization
 - Feed item descriptions + user's YNAB categories to an LLM
 - AI suggests category for each item; user confirms/overrides in the UI
 - Cache confirmed ASIN-to-category mappings so repeat purchases auto-categorize
+- `azad_category_assignments` is intentionally preserved across pushes — these ASIN→category mappings serve as training data for auto-categorization
 - Could start with simple keyword matching, graduate to LLM API calls
 - Works with cloud APIs (OpenAI, Anthropic) or potentially local models
 
@@ -76,7 +78,7 @@ Categorization must happen before pushing to YNAB — pushing uncategorized data
 ## Design Principles
 
 1. **Categorization UI as command center** — the categorize tab is the primary destination, not a side effect of scraping. Data flows in automatically; the user works through their inbox.
-2. **Accumulate, don't overwrite** — each scrape adds to the pool. Re-scraping the same range updates existing entries. Category assignments persist independently across scrapes.
+2. **Accumulate, don't overwrite** — each scrape adds to the pool. Re-scraping the same range updates existing entries. Category assignments persist independently and survive pushes (training data). Pending transactions clear via successful YNAB push, not manual deletion.
 3. **Handler callback pattern** — `exportBudgetData` takes a handler function. CSV export, merge-to-pool, and future API push are all just different handlers.
 4. **Extension architecture** — API calls go through background service worker (avoids CORS). Follow existing `fetch_url` message pattern in `background.ts`.
 5. **Incremental value** — each milestone is independently useful. CSV export works today, categorization UI is better, API push is best.

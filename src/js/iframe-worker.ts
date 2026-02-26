@@ -307,12 +307,14 @@ export async function handleInstructionsResponse(msg: any): Promise<void> {
         ) {
           const startDate = new Date(msg.start_date);
           const endDate = new Date(msg.end_date);
-          transaction.reallyScrapeAndPublish(
+          await transaction.reallyScrapeAndPublish(
             ports.getBackgroundPort,
             startDate,
             endDate,
             msg.client,
           );
+
+          await removeThisIframe();
         } else if (msg.hasOwnProperty('years')) {
           const years = (msg.years as string[]).map(ys => +ys).sort();
           const minYear = years.at(0)!;
