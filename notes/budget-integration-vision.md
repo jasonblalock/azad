@@ -4,7 +4,7 @@
 
 Amazon transactions imported into budget software (YNAB, Actual Budget, etc.) from bank feeds show only "Amazon $47.23" with no item detail. Categorizing these is tedious — users must cross-reference Amazon order history manually. Multi-item transactions are worse: splitting requires knowing which items cost what and belong in which category.
 
-## Current State (Milestone 1 - Complete)
+## Milestone 1: Enriched CSV Export (Complete)
 
 - Extension scrapes Amazon transactions and correlates them with order item details
 - Enriched CSV export with item descriptions and categories in memo field
@@ -16,17 +16,44 @@ Amazon transactions imported into budget software (YNAB, Actual Budget, etc.) fr
 - **Categories not appearing in CSV** — likely `show_category_in_items_view` setting is off, or Amazon breadcrumb XPath is broken. Needs investigation.
 - **Memo field too long** — full Amazon product titles joined together are unreadable in YNAB's UI, very difficult to then categorize
 
-## Ideal Progression
+## Milestone 2: YNAB Integration + Categorization UI (In Progress)
 
-### Milestone 2: YNAB Integration + Categorization UI
 Categorization must happen before pushing to YNAB — pushing uncategorized data with broken categories and overlong memos creates cleanup work, and we'd need to update those same transactions later. Better to categorize locally, then push clean data once.
 
-- Done: PAT auth to YNAB API
-- Done: Fetch user's budgets and categories (confirmed API access works)
-- Categorization UI within the extension (new tab or options page)
-- Show each item individually with description, price, and category picker (populated from user's cached YNAB categories)
-- User rapidly categorizes items locally
-- Push categorized, split transactions to YNAB via API as the final step
+### Done
+- PAT auth to YNAB API via popup settings UI (`control.ts`, `popup.html`)
+- Fetch user's budgets and categories with caching (`ynab_api.ts`)
+- Categorization UI in a dedicated extension tab (`categorize.ts`, `categorize.html`, `categorize.css`)
+  - Sticky header with progress counter ("X of Y items categorized")
+  - One section per transaction with date, vendor, amount, order IDs
+  - Item table with description, price, qty, and YNAB category dropdown
+  - Categories flattened from YNAB groups as "Group: Category", hidden/deleted filtered, sorted alphabetically
+  - Green row highlighting on assignment, debounced auto-save to `chrome.storage.local`
+  - Selections persist across tab close/reopen
+  - Transactions with no items get a single category picker for the whole transaction
+- "Categorize for YNAB" button in table UI (gated on `budget_export_enabled` + `ynab_pat` non-empty)
+- Data persistence: enriched transactions serialized to `chrome.storage.local` with proper Date handling
+- Back-button fix to prevent broken navigation states after table injection
+- Detailed plan in ./greedy-forging-blanket.md
+
+### Remaining
+- **YNAB push** — read saved assignments and push split transactions via YNAB API
+- **Tax/fee pro-ration** — distribute remainder (tax, shipping) proportionally across items at push time
+- **Same-category flattening** — combine items sharing a category into one subtransaction at push time
+- **Refunds** — require manual intervention; order IDs in memos help users correlate
+
+### Known Issues
+- **Back-button fix doesn't work with popup open** — `history.pushState` behaves unexpectedly in content script context when Chrome popup has focus. Works fine when popup is closed.
+- **Item key collision edge case** — `${orderId}:${asin}` key format could collide if the same ASIN appears multiple times in one order (e.g. consumables re-ordered). Rare but possible.
+
+## Next Up
+
+### Milestone 2b: YNAB Push
+- Read saved category assignments from `azad_category_assignments`
+- Pro-rate taxes/fees across items proportionally (rounding remainder on largest item)
+- Flatten same-category items into single subtransactions (memo joined by ` | `)
+- Push split transactions to YNAB API via background service worker
+- Order IDs in parent transaction memo
 
 ### Milestone 3: AI-Assisted Categorization
 - Feed item descriptions + user's YNAB categories to an LLM
