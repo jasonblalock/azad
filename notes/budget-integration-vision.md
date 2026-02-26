@@ -1,5 +1,7 @@
 # Budget Integration Vision
 
+> **Scope:** High-level vision and milestone tracking for the budget integration feature. Covers the problem statement, what's done, what's planned, and design principles. For implementation details, see `budget-integration-architecture.md`.
+
 ## Problem
 
 Amazon transactions imported into budget software (YNAB, Actual Budget, etc.) from bank feeds show only "Amazon $47.23" with no item detail. Categorizing these is tedious — users must cross-reference Amazon order history manually. Multi-item transactions are worse: splitting requires knowing which items cost what and belong in which category.

@@ -1,6 +1,6 @@
 # Budget Integration Architecture
 
-How the budget/YNAB integration works within the azad extension.
+> **Scope:** Documents the architecture of the budget/YNAB integration we're building on top of azad. Covers our additions: data model, enrichment pipeline, YNAB API, categorization UI, storage keys, and design decisions. For the base extension architecture, see `base-azad-research.md`. For milestone tracking and vision, see `budget-integration-vision.md`.
 
 ## Data Model
 
@@ -117,7 +117,7 @@ Saves: debounced 300ms writes to `azad_category_assignments` on every dropdown c
 
 1. **Accumulate, don't overwrite** — `mergeForCategorization` dedupes by transaction key. Multiple scrapes build up the pool. Re-scraping the same range updates existing entries.
 2. **Auto-persist** — enrichment runs automatically after order details finish. No manual button click needed to save data.
-3. **Tab reuse** — `open_tab` handler queries for existing tab before creating new one. Prevents duplicates.
+3. **Tab reuse** — `open_tab` handler uses `chrome.tabs.query({ url })` to find existing tab before creating a new one. Requires the `"tabs"` permission in `manifest.json` (without it, URL-based queries silently return empty). This permission also enables future tab-to-tab communication between the categorize UI and Amazon content scripts.
 4. **Pro-rate taxes at push time** — item prices don't sum to transaction total (tax, shipping). Distribute remainder proportionally. Rounding remainder on largest item. UI shows raw prices.
 5. **Flatten same-category items at push time** — items sharing a YNAB category combine into one subtransaction, memos joined by ` | `.
 6. **Refunds require manual intervention** — Amazon calculates refunds independently. Order IDs in memos help users correlate.

@@ -1,6 +1,6 @@
 # Base Azad Architecture Research
 
-Preliminary notes on how the base extension works. Enough to build on; deep dive deferred to a future session.
+> **Scope:** Documents the original azad extension architecture as we found it — before our budget integration changes. Covers the base caching layers, scrape pipeline, storage keys, content script patterns, and what's ephemeral vs persisted. Preliminary notes; deep dive deferred to a future session. For our additions, see `budget-integration-architecture.md`.
 
 ## Storage Layers
 
