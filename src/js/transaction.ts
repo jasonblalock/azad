@@ -43,13 +43,11 @@ export async function reallyScrapeAndPublish(
   endDate: Date,
   client: string,
 ) {
-  const port = await getPort();
-
   const transactions = await strategy.firstMatchingStrategyAsync(
     'transaction.reallyScrapeAndPublish',
     [
-      () => extractAllTransactionsWithNextButton(port),
-      () => extractAllTransactionsWithScrolling(port),
+      () => extractAllTransactionsWithNextButton(getPort),
+      () => extractAllTransactionsWithScrolling(getPort),
     ],
     [],
   );
@@ -60,6 +58,7 @@ export async function reallyScrapeAndPublish(
   const url = document.URL;
 
   try {
+    const port = await getPort();
     if (port) {
       port.postMessage({
         action: 'transactions',
@@ -155,7 +154,7 @@ function mergeTransactions(
 }
 
 async function extractAllTransactionsWithNextButton(
-  port: chrome.runtime.Port | null
+  getPort: () => Promise<chrome.runtime.Port | null>,
 ): Promise<Transaction[]> {
 
   if (!findUsableNextButton()) {
@@ -170,7 +169,7 @@ async function extractAllTransactionsWithNextButton(
 
   const statistics = new stats.Statistics();
   statistics.increment(stats.OStatsKey.RUNNING_COUNT);
-  updateStatistics();
+  await updateStatistics();
 
   const maxCachedTimestamp = Math.max(
     ...allKnownTransactions.map(t => t.date.getTime()));
@@ -178,10 +177,11 @@ async function extractAllTransactionsWithNextButton(
   let shouldContinue = true;
 
   while(shouldContinue) {
+    const port = await getPort();
     if (port) {
       port.postMessage({action: 'keepalive'});
-      updateStatistics();
     }
+    await updateStatistics();
 
     page = await retryingExtractPageOfTransactions();
     console.log('scraped', page.length, 'transactions');
@@ -217,10 +217,7 @@ async function extractAllTransactionsWithNextButton(
 
   putTransactionsInCache(allKnownTransactions);
   statistics.decrement(stats.OStatsKey.RUNNING_COUNT);  // we're done working.
-
-  if (port) {
-    updateStatistics();
-  }
+  await updateStatistics();
 
   return allKnownTransactions;
 
@@ -237,7 +234,7 @@ async function extractAllTransactionsWithNextButton(
     }
   }
 
-  function updateStatistics(): void {
+  async function updateStatistics(): Promise<void> {
     statistics.set(stats.OStatsKey.PAGE_COUNT, pageCount);
     statistics.set(stats.OStatsKey.COMPLETED_COUNT, page.length);
     statistics.set(stats.OStatsKey.CACHE_HIT_COUNT, countFromCache);
@@ -248,15 +245,15 @@ async function extractAllTransactionsWithNextButton(
         allKnownTransactions.map(t => t.date.getFullYear())).size,
     );
 
-    statistics.publish(
-      () => Promise.resolve(port),
+    await statistics.publish(
+      getPort,
       'transactions'
     );
   }
 }
 
 async function extractAllTransactionsWithScrolling(
-  port: chrome.runtime.Port | null
+  getPort: () => Promise<chrome.runtime.Port | null>,
 ): Promise<Transaction[]> {
   // What behaviour are we exploiting?
   // ---------------------------------
@@ -389,7 +386,7 @@ async function extractAllTransactionsWithScrolling(
       return [];
     },
 
-    updateStatistics: function(): void {
+    updateStatistics: async function(): Promise<void> {
       try {
         statistics.set(stats.OStatsKey.PAGE_COUNT, counts.length);
         statistics.set(stats.OStatsKey.COMPLETED_COUNT, page.length);
@@ -409,8 +406,8 @@ async function extractAllTransactionsWithScrolling(
           years.size,
         );
 
-        statistics.publish(
-          () => Promise.resolve(port),
+        await statistics.publish(
+          getPort,
           'transactions'
         );
       } catch (ex) {
@@ -420,10 +417,11 @@ async function extractAllTransactionsWithScrolling(
   };
 
   while(helpers.scrollLoopShouldContinue()) {
+    const port = await getPort();
     if (port) {
       port.postMessage({action: 'keepalive'});
-      helpers.updateStatistics();
     }
+    await helpers.updateStatistics();
 
     helpers.commandScroll();
     const INCREMENT_MILLIS = 1000;
@@ -448,10 +446,7 @@ async function extractAllTransactionsWithScrolling(
   }
 
   statistics.decrement(stats.OStatsKey.RUNNING_COUNT);  // we're done working.
-
-  if (port) {
-    helpers.updateStatistics();
-  }
+  await helpers.updateStatistics();
 
   if (helpers.overlapped()) {
     const mergedTransactions = mergeTransactions(page, cachedTransactions);

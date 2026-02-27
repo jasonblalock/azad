@@ -78,6 +78,28 @@ If the user navigates away mid-scrape, any HTTP responses already fetched are in
 
 The transaction cache is especially robust: `putTransactionsInCache` writes progressively as pages are scraped, so even partial scrapes persist what was collected.
 
+## Stats Publishing
+
+Two mechanisms for publishing scraping progress stats to the popup:
+
+### Order scraping (root page path)
+- `inject.ts` creates a scheduler via `resetScheduler()`, which starts `setStatsTimeout()` — a recurring 2-second timer
+- Timer calls `_stats.publish(ports.getBackgroundPort, purpose)`, passing the **port getter function**
+- Stats flow: root page → background (`statistics_update` case) → `control_port` → popup
+- This path is reliable because the root page's port persists for the tab's lifetime
+
+### Transaction scraping (iframe worker path)
+- Transaction scraping runs inside an iframe worker (`/cpe/yourpayments/transactions`)
+- The iframe has its own port (`azad_iframe_worker:...`) to the background
+- `transaction.ts` extraction functions publish stats via `statistics.publish(getPort, 'transactions')`
+- Stats flow: iframe → background → `control_port` → popup (same routing, different source port)
+
+### Gotchas discovered
+- **Missing `await` on date-range scraping** (`iframe-worker.ts`): The date-range path originally didn't `await` `reallyScrapeAndPublish()`, causing scraping to fire-and-forget. The year-based path had `await`. Both paths also need `await removeThisIframe()` after scraping completes.
+- **Captured port vs port getter**: The extraction functions originally captured `port` once at the start (`const port = await getPort()`) and passed `() => Promise.resolve(port)` to `statistics.publish()`. If the port disconnects/reconnects during scraping, the captured reference goes stale. Fix: pass the `getPort` function through and call it fresh each time, matching how budget order details stats work.
+- **Unawaited `statistics.publish()`**: The `updateStatistics()` helpers called `statistics.publish()` (async) without `await`. In iframe contexts this can cause stats messages to not be sent before context changes. Fix: make `updateStatistics` async and await the publish.
+- **No `control_port` disconnect handler**: `background.ts` stored the popup's port in `control_port` but never cleared it on disconnect, leaving a stale reference. Fix: add `port.onDisconnect.addListener(() => { control_port = null; })`.
+
 ## Request Scheduler Caching
 
 Order data is cached at the HTTP-response level, not as assembled order objects. Cache key format: `"<request_type>#<url>"`.

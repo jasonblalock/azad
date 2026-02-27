@@ -309,6 +309,10 @@ function registerConnectionListener() {
       case 'azad_control':
         control_port = port;
 
+        port.onDisconnect.addListener(() => {
+          control_port = null;
+        });
+
         port.onMessage.addListener(async (msg) => {
           handleMessageFromControl(msg);
         });
