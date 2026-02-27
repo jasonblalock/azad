@@ -39,12 +39,15 @@ Categorization must happen before pushing to YNAB — pushing uncategorized data
 - "Open categorization" button on Amazon table (awaits auto-enrich, then opens tab)
 - Tab reuse: opening categorization focuses existing tab instead of creating duplicates
 - Back-button fix to prevent broken navigation states after table injection
+- **YNAB push** — categorize page builds split transactions and pushes via YNAB SDK, with idempotent `import_id` generation
+- **Card-to-account mapping** — each unique card (e.g., "Visa **** 1234") maps to a YNAB account via dropdowns in the categorize header; persisted to `azad_card_account_map`
+- **Basic remainder handling** — tax/shipping difference between item prices and transaction total is lumped on the largest subtransaction
+- **Post-push cleanup** — successfully pushed transactions are removed from `azad_pending_categorization`
 - Architecture docs in ./base-azad-research.md and ./budget-integration-architecture.md
 - Detailed categorization UI plan in ./greedy-forging-blanket.md
 
 ### Remaining
-- **YNAB push** — read saved assignments and push split transactions via YNAB API
-- **Tax/fee pro-ration** — distribute remainder (tax, shipping) proportionally across items at push time
+- **Tax/fee pro-ration** — distribute remainder (tax, shipping) proportionally across items at push time (currently lumped on largest item)
 - **Same-category flattening** — combine items sharing a category into one subtransaction at push time
 - **Refunds** — require manual intervention; order IDs in memos help users correlate
 
@@ -53,14 +56,6 @@ Categorization must happen before pushing to YNAB — pushing uncategorized data
 - **Item key collision edge case** — `${orderId}:${asin}` key format could collide if the same ASIN appears multiple times in one order (e.g. consumables re-ordered). Rare but possible.
 
 ## Next Up
-
-### Milestone 2b: YNAB Push
-- Read saved category assignments from `azad_category_assignments`
-- Pro-rate taxes/fees across items proportionally (rounding remainder on largest item)
-- Flatten same-category items into single subtransactions (memo joined by ` | `)
-- Push split transactions to YNAB API via background service worker
-- Order IDs in parent transaction memo
-- Remove successfully pushed transactions from `azad_pending_categorization` (this is how the pending queue clears — no manual "clear" button needed)
 
 ### Milestone 3: AI-Assisted Categorization
 - Feed item descriptions + user's YNAB categories to an LLM
@@ -71,6 +66,7 @@ Categorization must happen before pushing to YNAB — pushing uncategorized data
 - Works with cloud APIs (OpenAI, Anthropic) or potentially local models
 
 ### Future Milestones
+- **Smart card-to-account mapping** — auto-suggest YNAB account based on card issuer/digits (e.g., "Visa **** 1234" fuzzy-matched against YNAB account names), or learn from user's previous mappings
 - Support Actual Budget / Monarch Money as alternative targets
 - Pull YNAB bank-feed transactions, match against Amazon data by date/amount, update in place
 - Learn from user's categorization history for better suggestions over time

@@ -412,8 +412,14 @@ async function handleYnabBudgetChange() {
 
   const token = await settings.getString('ynab_pat');
   try {
-    const groups = await ynab.fetchCategories(token, budgetId);
-    await ynab.cacheCategories(groups);
+    const [groups, accounts] = await Promise.all([
+      ynab.fetchCategories(token, budgetId),
+      ynab.fetchAccounts(token, budgetId),
+    ]);
+    await Promise.all([
+      ynab.cacheCategories(groups),
+      ynab.cacheAccounts(accounts),
+    ]);
 
     const activeCount = groups
       .filter(g => !g.hidden && !g.deleted)
@@ -484,6 +490,15 @@ async function initYnab() {
         const infoEl = document.getElementById('azad_ynab_categories_info')!;
         infoEl.textContent = `${activeCount} categories cached`;
         infoEl.classList.remove('hidden');
+      }
+
+      // Backfill accounts if not cached
+      const cachedAccounts = await ynab.getCachedAccounts();
+      if (!cachedAccounts && savedBudgetId) {
+        try {
+          const accounts = await ynab.fetchAccounts(token, savedBudgetId);
+          await ynab.cacheAccounts(accounts);
+        } catch (_) { }
       }
 
       // Show "Open Categorization" button if pending data exists

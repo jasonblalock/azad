@@ -24,9 +24,18 @@ body {
   padding: 12px 16px;
   margin: -16px -16px 16px -16px;
   z-index: 100;
+}
+
+.azad-cat-header-top {
   display: flex;
   justify-content: space-between;
   align-items: center;
+}
+
+.azad-cat-header-right {
+  display: flex;
+  align-items: center;
+  gap: 16px;
 }
 
 .azad-cat-header h1 {
@@ -140,4 +149,122 @@ body {
   text-align: center;
   color: #c00;
   font-size: 16px;
+}
+
+/* Refresh button */
+
+.azad-refresh-btn {
+  padding: 8px 14px;
+  font-size: 13px;
+  color: #555;
+  background: #f0f0f0;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.azad-refresh-btn:hover:not(:disabled) {
+  background: #e0e0e0;
+  border-color: #bbb;
+}
+
+.azad-refresh-btn:disabled {
+  color: #999;
+  cursor: not-allowed;
+}
+
+/* Push button */
+
+.azad-push-btn {
+  padding: 8px 20px;
+  font-size: 14px;
+  font-weight: bold;
+  color: #fff;
+  background: #2ea1d9;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.azad-push-btn:hover:not(:disabled) {
+  background: #2590c4;
+}
+
+.azad-push-btn:disabled {
+  background: #bbb;
+  cursor: not-allowed;
+}
+
+/* Push status message */
+
+.azad-push-status {
+  font-size: 13px;
+  margin-top: 8px;
+  min-height: 0;
+}
+
+.azad-push-status:empty {
+  display: none;
+}
+
+.azad-push-status.success {
+  color: #2a7d2a;
+}
+
+.azad-push-status.error {
+  color: #c00;
+}
+
+/* Card-to-account mapping */
+
+.azad-card-mapping {
+  margin-top: 10px;
+  padding: 10px 12px;
+  background: #f8f9fa;
+  border: 1px solid #e9ecef;
+  border-radius: 4px;
+}
+
+.azad-card-mapping-title {
+  font-size: 12px;
+  font-weight: bold;
+  color: #666;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+
+.azad-card-mapping-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 0;
+}
+
+.azad-card-label {
+  font-size: 13px;
+  font-weight: 600;
+  min-width: 160px;
+  color: #444;
+}
+
+.azad-card-arrow {
+  color: #999;
+  font-size: 14px;
+}
+
+.azad-account-select {
+  flex: 1;
+  max-width: 300px;
+  padding: 4px 6px;
+  font-size: 13px;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+}
+
+.azad-account-select:focus {
+  border-color: CornflowerBlue;
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(100, 149, 237, 0.3);
 }

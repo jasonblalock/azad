@@ -57,7 +57,9 @@ Amazon page scrape (content script on amazon.com)
 |---|---|---|---|
 | `azad_pending_categorization` | `budget_shim.ts` | `EnrichedTransaction[]` pool (serialized with ISO date strings) | Accumulates across scrapes, deduped by transaction key |
 | `azad_category_assignments` | `categorize.ts` | `Record<itemKey, ynab_category_id>` | Persists indefinitely, debounced 300ms save |
-| `ynab_categories` | `ynab_api.ts` | `YnabCategoryGroup[]` from YNAB API | Refreshed when user selects budget in popup |
+| `ynab_categories` | `ynab_api.ts` | `YnabCategoryGroup[]` from YNAB API | Refreshed on budget selection, on-demand if missing, or via refresh button on categorize page |
+| `ynab_accounts` | `ynab_api.ts` | `YnabAccount[]` (open, on-budget) from YNAB API | Refreshed on budget selection, on-demand if missing, or via refresh button on categorize page |
+| `azad_card_account_map` | `categorize.ts` | `Record<cardInfo, accountId>` mapping card strings to YNAB accounts | Persists indefinitely, updated via card mapping UI |
 
 ## Enrichment Pipeline
 
@@ -97,6 +99,7 @@ On load:
 1. `loadPendingCategorization()` — enriched transactions from storage
 2. `getCachedCategories()` — YNAB category groups from cache
 3. `loadAssignments()` — previously saved category assignments
+4. `getCachedAccounts()` — if empty, fetches live from YNAB API using PAT/budget from settings and caches
 
 Renders:
 - Sticky header with progress counter ("X of Y items categorized")
@@ -107,11 +110,36 @@ Renders:
 
 Saves: debounced 300ms writes to `azad_category_assignments` on every dropdown change.
 
+Refresh button in header fetches fresh accounts and categories from YNAB API, caches both, and re-renders the page preserving existing assignments and card mappings.
+
 ## Entry Points to Categorization UI
 
 1. **Popup button** — "Open Categorization (N transactions)" in YNAB section, visible when pending data exists
 2. **Table button** — "open categorization" on the Amazon transactions table, awaits auto-enrich then opens tab
 3. Both use `open_tab` message to background, which reuses existing tab if one is open
+
+## Push Flow
+
+```
+categorize.ts (Push to YNAB button clicked)
+  → buildYnabTransactions() in ynab_push.ts
+    - Validates: all items categorized, all cards mapped
+    - Builds SaveTransaction[] with splits, remainder on largest item
+    - Generates idempotent import_id: YNAB:{milliunits}:{date}:{occurrence}
+  → ynab.API(token).transactions.createTransaction(budgetId, { transactions })
+    - SDK handles REST call directly (extension page, no CORS issue)
+    - Returns created IDs + duplicate_import_ids for idempotency
+  → removePendingTransactions() in budget_shim.ts
+    - Filters out pushed transactions by transactionKey
+    - Saves remaining back to azad_pending_categorization
+  → UI updates: sections removed, success message shown
+```
+
+### import_id Generation
+
+Format: `YNAB:{milliunits}:{date}:{occurrence}` (max 36 chars)
+
+This matches YNAB's own import format for bank feeds, enabling dedup across API pushes and file-based imports. The `occurrence` counter increments per unique `amount+date` combination within a single push batch.
 
 ## Design Decisions
 

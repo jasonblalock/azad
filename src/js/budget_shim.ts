@@ -118,7 +118,7 @@ export async function downloadEnrichedCsv(
 
 const PENDING_STORAGE_KEY = 'azad_pending_categorization';
 
-function transactionKey(t: EnrichedTransaction): string {
+export function transactionKey(t: EnrichedTransaction): string {
   if (t.orderIds.length > 0) {
     return t.orderIds.slice().sort().join(',');
   }
@@ -167,6 +167,25 @@ export function loadPendingCategorization(): Promise<EnrichedTransaction[] | nul
         return;
       }
       resolve((raw as any[]).map(deserializeTransaction));
+    });
+  });
+}
+
+export async function removePendingTransactions(
+  keysToRemove: string[]
+): Promise<void> {
+  const existing = await loadPendingCategorization();
+  if (!existing) return;
+  const removeSet = new Set(keysToRemove);
+  const remaining = existing.filter(t => !removeSet.has(transactionKey(t)));
+  const serializable = remaining.map(serializeTransaction);
+  return new Promise((resolve, reject) => {
+    chrome.storage.local.set({ [PENDING_STORAGE_KEY]: serializable }, () => {
+      if (chrome.runtime.lastError) {
+        reject(chrome.runtime.lastError.message);
+      } else {
+        resolve();
+      }
     });
   });
 }
