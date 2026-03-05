@@ -22,6 +22,19 @@ function txnKey(txn: EnrichedTransaction, index: number): string {
   return `txn:${txn.orderIds.join(',')}:${index}`;
 }
 
+export function isTransactionReady(
+  txn: EnrichedTransaction,
+  txnIndex: number,
+  assignments: Record<string, string>,
+  cardAccountMap: Record<string, string>,
+): boolean {
+  if (!cardAccountMap[txn.cardInfo]) return false;
+  if (txn.items.length === 0) {
+    return !!assignments[txnKey(txn, txnIndex)];
+  }
+  return txn.items.every((item, ii) => !!assignments[itemKey(item, ii)]);
+}
+
 function formatDate(d: Date): string {
   const year = d.getFullYear();
   const month = String(d.getMonth() + 1).padStart(2, '0');
@@ -53,38 +66,19 @@ export function buildYnabTransactions(
   for (let ti = 0; ti < transactions.length; ti++) {
     const txn = transactions[ti];
 
-    // Check card mapping
-    const accountId = cardAccountMap[txn.cardInfo];
-    if (!accountId) {
-      skipped.push({
-        transactionIndex: ti,
-        reason: `Unmapped card: ${txn.cardInfo}`,
-      });
+    // Check if transaction is fully ready (card mapped + all items categorized)
+    if (!isTransactionReady(txn, ti, assignments, cardAccountMap)) {
+      const reason = !cardAccountMap[txn.cardInfo]
+        ? `Unmapped card: ${txn.cardInfo}`
+        : txn.items.length === 0
+          ? 'Transaction not categorized'
+          : `${txn.items.filter((item, ii) => !assignments[itemKey(item, ii)]).length} uncategorized item(s)`;
+      skipped.push({ transactionIndex: ti, reason });
       continue;
     }
 
-    // Check all items categorized
+    const accountId = cardAccountMap[txn.cardInfo];
     const hasItems = txn.items.length > 0;
-    if (hasItems) {
-      const uncategorized = txn.items.filter(
-        (item, ii) => !assignments[itemKey(item, ii)]
-      );
-      if (uncategorized.length > 0) {
-        skipped.push({
-          transactionIndex: ti,
-          reason: `${uncategorized.length} uncategorized item(s)`,
-        });
-        continue;
-      }
-    } else {
-      if (!assignments[txnKey(txn, ti)]) {
-        skipped.push({
-          transactionIndex: ti,
-          reason: 'Transaction not categorized',
-        });
-        continue;
-      }
-    }
 
     const date = formatDate(txn.date);
     const amountMilliunits = -Math.round(txn.amount * 1000);

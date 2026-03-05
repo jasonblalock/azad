@@ -43,6 +43,8 @@ Categorization must happen before pushing to YNAB — pushing uncategorized data
 - **Card-to-account mapping** — each unique card (e.g., "Visa **** 1234") maps to a YNAB account via dropdowns in the categorize header; persisted to `azad_card_account_map`
 - **Basic remainder handling** — tax/shipping difference between item prices and transaction total is lumped on the largest subtransaction
 - **Post-push cleanup** — successfully pushed transactions are removed from `azad_pending_categorization`
+- **Partial push** — push button enables when at least one transaction is fully ready (all items categorized + card mapped); button label shows "Push N of M to YNAB" for partial readiness; pushed transactions removed from UI and storage while remaining ones stay editable
+- **Gift card filtering** — transactions paid with gift cards (`cardInfo` matching "gift card") are hidden from the categorize page to avoid double-counting (the gift card purchase itself was already on a credit card with a YNAB account)
 - Architecture docs in ./base-azad-research.md and ./budget-integration-architecture.md
 - Detailed categorization UI plan in ./greedy-forging-blanket.md
 

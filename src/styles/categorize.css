@@ -217,6 +217,15 @@ body {
   color: #c00;
 }
 
+/* Gift card filter note */
+
+.azad-gift-card-note {
+  font-size: 12px;
+  color: #888;
+  margin-top: 6px;
+  font-style: italic;
+}
+
 /* Card-to-account mapping */
 
 .azad-card-mapping {

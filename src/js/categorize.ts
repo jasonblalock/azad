@@ -17,7 +17,7 @@ import {
   YnabCategoryGroup,
   YnabAccount,
 } from './ynab_api';
-import { buildYnabTransactions } from './ynab_push';
+import { buildYnabTransactions, isTransactionReady } from './ynab_push';
 import * as settings from './settings';
 import * as ynab from 'ynab';
 
@@ -30,6 +30,10 @@ type CardAccountMap = Record<string, string>;
 interface FlatCategory {
   id: string;
   label: string; // "Group: Category"
+}
+
+function isGiftCardTransaction(txn: EnrichedTransaction): boolean {
+  return /gift\s*card/i.test(txn.cardInfo);
 }
 
 function itemKey(item: EnrichedTransactionItem, index: number): string {
@@ -117,6 +121,16 @@ function getUniqueCards(transactions: EnrichedTransaction[]): string[] {
     if (txn.cardInfo) cards.add(txn.cardInfo);
   }
   return Array.from(cards).sort();
+}
+
+function countPushable(
+  transactions: EnrichedTransaction[],
+  assignments: Assignments,
+  cardAccountMap: CardAccountMap,
+): number {
+  return transactions.filter(
+    (txn, ti) => isTransactionReady(txn, ti, assignments, cardAccountMap)
+  ).length;
 }
 
 function allCardsMapped(
@@ -281,26 +295,31 @@ function render(
 
   function updateProgress() {
     const { assigned, total } = countAssigned(transactions, assignments);
-    progress.innerHTML = `<span class="done">${assigned}</span> of ${total} items categorized`;
+    const pushable = countPushable(transactions, assignments, cardAccountMap);
+    progress.innerHTML = `<span class="done">${assigned}</span> of ${total} items categorized`
+      + (pushable > 0 && pushable < transactions.length
+        ? ` &middot; ${pushable} order(s) ready`
+        : '');
   }
 
   function updatePushState() {
     updateProgress();
     const { assigned, total } = countAssigned(transactions, assignments);
-    const allCategorized = assigned === total && total > 0;
-    const allMapped = allCardsMapped(uniqueCards, cardAccountMap);
+    const pushable = countPushable(transactions, assignments, cardAccountMap);
 
-    if (allCategorized && allMapped) {
+    if (pushable > 0) {
       pushBtn.disabled = false;
+      pushBtn.textContent = pushable === transactions.length
+        ? 'Push to YNAB'
+        : `Push ${pushable} of ${transactions.length} to YNAB`;
       pushBtn.title = '';
     } else {
       pushBtn.disabled = true;
+      pushBtn.textContent = 'Push to YNAB';
       const reasons: string[] = [];
-      if (!allCategorized) reasons.push(`${total - assigned} item(s) uncategorized`);
-      if (!allMapped) {
-        const unmapped = uniqueCards.filter(c => !cardAccountMap[c]).length;
-        reasons.push(`${unmapped} card(s) unmapped`);
-      }
+      if (assigned < total) reasons.push(`${total - assigned} item(s) uncategorized`);
+      const unmapped = uniqueCards.filter(c => !cardAccountMap[c]).length;
+      if (unmapped > 0) reasons.push(`${unmapped} card(s) unmapped`);
       pushBtn.title = reasons.join(', ');
     }
   }
@@ -372,8 +391,17 @@ function render(
         }
       }
 
-      pushBtn.textContent = 'Push to YNAB';
-      pushBtn.disabled = true;
+      // Update in-memory transactions array (iterate in reverse to preserve indices)
+      for (let i = transactions.length - 1; i >= 0; i--) {
+        if (pushedKeySet.has(transactionKey(transactions[i]))) {
+          transactions.splice(i, 1);
+        }
+      }
+
+      // Refresh unique cards list and UI state
+      uniqueCards.length = 0;
+      uniqueCards.push(...getUniqueCards(transactions));
+      updatePushState();
     } catch (err: any) {
       pushBtn.textContent = 'Push to YNAB';
       updatePushState();
@@ -570,6 +598,16 @@ document.addEventListener('DOMContentLoaded', async () => {
       return;
     }
 
+    // Filter out gift card transactions — they're already accounted for
+    // via the credit card used to buy the gift card.
+    const giftCardCount = transactions.filter(t => isGiftCardTransaction(t)).length;
+    const budgetTransactions = transactions.filter(t => !isGiftCardTransaction(t));
+
+    if (budgetTransactions.length === 0) {
+      root.innerHTML = '<div class="azad-cat-error">No transactions to categorize. All ' + giftCardCount + ' transaction(s) were gift card purchases (hidden).</div>';
+      return;
+    }
+
     if (!categoryGroups || categoryGroups.length === 0) {
       root.innerHTML = '<div class="azad-cat-error">No YNAB categories found. Connect to YNAB and select a budget in the extension settings first.</div>';
       return;
@@ -590,7 +628,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     const cats = flattenCategories(categoryGroups);
-    render(root, transactions, cats, assignments, resolvedAccounts, cardAccountMap);
+    render(root, budgetTransactions, cats, assignments, resolvedAccounts, cardAccountMap);
+
+    if (giftCardCount > 0) {
+      const note = document.createElement('div');
+      note.className = 'azad-gift-card-note';
+      note.textContent = `${giftCardCount} gift card transaction(s) hidden.`;
+      const header = root.querySelector('.azad-cat-header');
+      if (header) {
+        header.appendChild(note);
+      }
+    }
   } catch (err) {
     console.error('Categorize page error:', err);
     root.innerHTML = `<div class="azad-cat-error">Error loading data: ${err}</div>`;

@@ -97,9 +97,16 @@ Runs as an **extension page** (not content script), so has direct `chrome.storag
 
 On load:
 1. `loadPendingCategorization()` — enriched transactions from storage
-2. `getCachedCategories()` — YNAB category groups from cache
-3. `loadAssignments()` — previously saved category assignments
-4. `getCachedAccounts()` — if empty, fetches live from YNAB API using PAT/budget from settings and caches
+2. Filter out gift card transactions (see below)
+3. `getCachedCategories()` — YNAB category groups from cache
+4. `loadAssignments()` — previously saved category assignments
+5. `getCachedAccounts()` — if empty, fetches live from YNAB API using PAT/budget from settings and caches
+
+### Gift Card Filtering
+
+Transactions where `cardInfo` matches `/gift\s*card/i` (e.g., "Amazon Gift Card") are filtered out before rendering. These are never pushed to YNAB because the money is already accounted for — the gift card itself was purchased with a credit card that has a YNAB account, so pushing gift card spend would double-count.
+
+Filtered transactions remain in `azad_pending_categorization` (filter is display-only). If any are filtered, a note ("N gift card transaction(s) hidden") appears in the header.
 
 Renders:
 - Sticky header with progress counter ("X of Y items categorized")
@@ -123,7 +130,9 @@ Refresh button in header fetches fresh accounts and categories from YNAB API, ca
 ```
 categorize.ts (Push to YNAB button clicked)
   → buildYnabTransactions() in ynab_push.ts
-    - Validates: all items categorized, all cards mapped
+    - Uses isTransactionReady() to check each transaction
+    - Only fully-ready transactions (all items categorized + card mapped) are built
+    - Incomplete transactions are skipped and remain in the pending pool
     - Builds SaveTransaction[] with splits, remainder on largest item
     - Generates idempotent import_id: YNAB:{milliunits}:{date}:{occurrence}
   → ynab.API(token).transactions.createTransaction(budgetId, { transactions })
@@ -132,7 +141,8 @@ categorize.ts (Push to YNAB button clicked)
   → removePendingTransactions() in budget_shim.ts
     - Filters out pushed transactions by transactionKey
     - Saves remaining back to azad_pending_categorization
-  → UI updates: sections removed, success message shown
+  → UI updates: pushed sections removed, in-memory array spliced,
+    remaining transactions stay editable, push button re-evaluated
 ```
 
 ### import_id Generation
@@ -150,3 +160,4 @@ This matches YNAB's own import format for bank feeds, enabling dedup across API 
 5. **Flatten same-category items at push time** — items sharing a YNAB category combine into one subtransaction, memos joined by ` | `.
 6. **Refunds require manual intervention** — Amazon calculates refunds independently. Order IDs in memos help users correlate.
 7. **YNAB split transactions cannot be updated after creation** — categorization must happen before push. This is why the categorize UI exists.
+8. **Shared validation via `isTransactionReady()`** — `isTransactionReady()` in `ynab_push.ts` is the single source of truth for whether a transaction can be pushed (card mapped + all items categorized). Used by both `buildYnabTransactions()` and the UI's `countPushable()` to keep push eligibility logic in sync.
